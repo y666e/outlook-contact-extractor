@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Contact Extractor Pro — Paste & Save</title>
+
+  <!-- Use same CSS and config as the Outlook add-in -->
+  <link rel="stylesheet" type="text/css" href="taskpane.css" />
+  <script type="text/javascript" src="config.js"></script>
+
+  <style>
+    /* Page wrapper to mimic taskpane but centered and wider */
+    .page-wrapper {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    .brand-bar {
+      text-align: center;
+      margin-bottom: 16px;
+    }
+    .brand-title {
+      color: #ffffff;
+      font-size: 18px;
+      font-weight: 300;
+      letter-spacing: 2px;
+      margin-bottom: 6px;
+    }
+    .brand-sub {
+      color: rgba(255,255,255,0.6);
+      font-size: 11px;
+      letter-spacing: 1px;
+    }
+
+    /* Wider manual input section */
+    .manual-input-section {
+      max-width: 860px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    /* Contact grid wider */
+    .contacts-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 840px) {
+      .contacts-container {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Buttons row */
+    .buttons-row {
+      display: flex;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    /* Footer note */
+    .footer-note {
+      margin-top: 24px;
+      color: rgba(255,255,255,0.5);
+      font-size: 11px;
+      text-align: center;
+    }
+
+    /* Success/Error banners */
+    .banner {
+      margin: 12px 0;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 12px;
+    }
+    .banner-success {
+      background: rgba(15, 157, 88, 0.1);
+      border: 1px solid rgba(15, 157, 88, 0.3);
+      color: #0F9D58;
+    }
+    .banner-error {
+      background: rgba(231, 76, 60, 0.1);
+      border: 1px solid rgba(231, 76, 60, 0.3);
+      color: #E74C3C;
+    }
+    .banner-warning {
+      background: rgba(243, 156, 18, 0.1);
+      border: 1px solid rgba(243, 156, 18, 0.3);
+      color: #F39C12;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="page-wrapper">
+    <!-- Brand -->
+    <div class="brand-bar">
+      <div class="brand-title">CONTACT EXTRACTOR — PASTE & SAVE</div>
+      <div class="header-line" style="margin: 8px auto;"></div>
+      <div class="brand-sub">AI-POWERED EXTRACTION • SAME DATABASE • NO INSTALL</div>
+    </div>
+
+    <!-- Header card -->
+    <div class="header-section">
+      <div class="header-title">CONTACT EXTRACTOR</div>
+      <div class="header-line"></div>
+      <div class="header-subtitle">AI-POWERED EXTRACTION</div>
+    </div>
+
+    <!-- Status banners -->
+    <div id="statusBanner" class="banner" style="display:none;"></div>
+
+    <!-- Manual Input Section (same style as taskpane, wider) -->
+    <div class="manual-input-section">
+      <div class="manual-input-header">
+        <div class="manual-input-title">MANUAL INPUT</div>
+        <div class="manual-input-subtitle">Paste an email signature and extract all fields</div>
+      </div>
+
+      <textarea id="manualSignatureInput"
+                class="manual-signature-input"
+                placeholder="Paste the complete signature text here..."
+                rows="6"></textarea>
+
+      <div class="buttons-row">
+        <button id="extractButton" class="extract-button">
+          <span class="button-text">EXTRACT</span>
+        </button>
+        <button id="clearButton" class="secondary-button">
+          <span class="button-text">CLEAR</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Stats Section -->
+    <div id="statsSection" class="stats-section" style="display: none;">
+      <div class="stats-text" id="statsText">FOUND 0 SIGNATURES</div>
+      <div class="stats-subtitle">Review and process contacts below</div>
+    </div>
+
+    <!-- Contacts Grid -->
+    <div id="contactsContainer" class="contacts-container"></div>
+
+    <!-- Edit Modal (reuse taskpane styles/structure) -->
+    <div id="editModal" class="modal-overlay" style="display: none;">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div class="modal-title">EDIT CONTACT</div>
+          <div class="modal-subtitle">Complete all fields before saving</div>
+          <div class="modal-line"></div>
+        </div>
+
+        <div class="modal-body">
+          <form id="contactForm" class="contact-form">
+            <div class="input-group">
+              <label class="input-label">COMPANY</label>
+              <input type="text" id="company" class="form-input" />
+            </div>
+
+            <div class="input-group">
+              <label class="input-label">SECTOR</label>
+              <select id="sector" class="form-select">
+                <option value="">Select sector...</option>
+                <option value="Government">Government</option>
+                <option value="Semi-government">Semi-government</option>
+                <option value="Private">Private</option>
+              </select>
+            </div>
+
+            <div class="input-group">
+              <label class="input-label">INDUSTRY</label>
+              <select id="industry" class="form-select">
+                <option value="">Select industry...</option>
+                <option value="Accounting, Finance & Banking">Accounting, Finance & Banking</option>
+                <option value="Agriculture, Food & Beverage">Agriculture, Food & Beverage</option>
+                <option value="Arts, Media & Entertainment">Arts, Media & Entertainment</option>
+                <option value="Construction, Real Estate & Infrastructure">Construction, Real Estate & Infrastructure</option>
+                <option value="Consulting, Legal & Professional Services">Consulting, Legal & Professional Services</option>
+                <option value="Consumer Goods, Retail & Hospitality">Consumer Goods, Retail & Hospitality</option>
+                <option value="Education, Training & Non-Profit">Education, Training & Non-Profit</option>
+                <option value="Energy, Utilities & Environmental Services">Energy, Utilities & Environmental Services</option>
+                <option value="Government, Public Policy & International Affairs">Government, Public Policy & International Affairs</option>
+                <option value="Healthcare, Pharmaceuticals & Life Sciences">Healthcare, Pharmaceuticals & Life Sciences</option>
+                <option value="Human Resources & Career Services">Human Resources & Career Services</option>
+                <option value="Information Technology, Software & Digital Services">Information Technology, Software & Digital Services</option>
+                <option value="Logistics, Transportation & Supply Chain">Logistics, Transportation & Supply Chain</option>
+                <option value="Manufacturing & Industrial Engineering">Manufacturing & Industrial Engineering</option>
+                <option value="Marketing, Advertising & Communications">Marketing, Advertising & Communications</option>
+                <option value="Science, Research & Innovation">Science, Research & Innovation</option>
+                <option value="Security, Defense & Aerospace">Security, Defense & Aerospace</option>
+                <option value="Sports, Recreation & Wellness">Sports, Recreation & Wellness</option>
+              </select>
+            </div>
+
+            <div class="input-group">
+              <label class="input-label">NAME</label>
+              <input type="text" id="name" class="form-input" />
+            </div>
+
+            <div class="input-group">
+              <label class="input-label">TITLE</label>
+              <input type="text" id="title" class="form-input" />
+            </div>
+
+            <div class="input-group">
+              <label class="input-label">EMAIL</label>
+              <input type="email" id="email" class="form-input" />
+            </div>
+
+            <div class="input-group">
+              <label class="input-label">PHONE</label>
+              <input type="text" id="phone" class="form-input" />
+            </div>
+
+            <div class="input-group">
+              <label class="input-label">PHONE 2</label>
+              <input type="text" id="phone2" class="form-input" />
+            </div>
+
+            <div class="input-group">
+              <label class="input-label">WEBSITE</label>
+              <input type="url" id="website" class="form-input" />
+            </div>
+
+            <div class="input-group">
+              <label class="input-label">LINKEDIN</label>
+              <input type="url" id="linkedin" class="form-input" />
+            </div>
+
+            <div class="input-group">
+              <label class="input-label">ADDRESS</label>
+              <textarea id="address" class="form-textarea" rows="3"></textarea>
+            </div>
+
+            <div class="input-group">
+              <label class="input-label">NOTES</label>
+              <textarea id="notes" class="form-textarea" rows="3"></textarea>
+            </div>
+          </form>
+        </div>
+
+        <div class="modal-footer">
+          <button id="saveButton" class="save-button" onclick="saveContact()">
+            <span class="button-text">💾 SAVE CONTACT</span>
+          </button>
+          <button id="cancelButton" class="cancel-button" onclick="closeEditModal()">
+            <span class="button-text">❌ CANCEL</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Messages -->
+    <div id="messageContainer" class="message-container" style="display:none;">
+      <div id="messageContent" class="message-content"></div>
+    </div>
+
+    <div class="footer-note">
+      Uses the same parser and backend as the Outlook Add-in. All entries go to the same Google Sheet database.
+    </div>
+  </div>
+
+  <script>
+    // Reuse most logic from taskpane.js (trimmed to essential parts for web use)
+
+    let currentContacts = [];
+    let currentEditingContact = null;
+
+    function setBanner(text, type='success') {
+      const el = document.getElementById('statusBanner');
+      el.className = 'banner ' + (type === 'success' ? 'banner-success' : type === 'error' ? 'banner-error' : 'banner-warning');
+      el.textContent = text;
+      el.style.display = 'block';
+      setTimeout(() => { el.style.display = 'none'; }, 5000);
+    }
+
+    function showMessage(message, type = 'success') {
+      const container = document.getElementById('messageContainer');
+      const content = document.getElementById('messageContent');
+      content.className = 'message-content';
+      content.classList.add('message-' + type);
+      content.textContent = message;
+      container.style.display = 'block';
+      container.classList.add('fade-in');
+      setTimeout(() => {
+        container.style.display = 'none';
+        container.classList.remove('fade-in');
+      }, CONFIG.MESSAGE_DISPLAY_DURATION || 5000);
+    }
+
+    function isEnglishText(text) {
+      if (!text || text.length === 0) return false;
+      const textForAnalysis = text.replace(/[^a-zA-Z\u0600-\u06FF\u4e00-\u9fff\u3400-\u4dbf]/g, '');
+      if (textForAnalysis.length === 0) return true;
+      const englishChars = (textForAnalysis.match(/[a-zA-Z]/g) || []).length;
+      const totalChars = textForAnalysis.length;
+      return (englishChars / totalChars) > (CONFIG.ENGLISH_THRESHOLD || 0.7);
+    }
+
+    function extractSignaturesFromMessage(body) {
+      if (!body || typeof body !== 'string') return [];
+      let cleaned = body
+        .replace(/\[.*?image.*?\]/gi, '')
+        .replace(/\r?\n{2,}/g, '\n')
+        .trim();
+      const signatures = [];
+      const messageBlocks = cleaned.split(/\nOn .* wrote:|\n---|\n______|\nFrom:|\nSent:|\n> |\n\*|\nReply|\nForward/i);
+      messageBlocks.forEach(block => {
+        const lines = block.split(/\n/).map(l => l.trim()).filter(l => l.length > 0);
+        const englishLines = lines.filter(line => isEnglishText(line));
+        if (englishLines.length < (CONFIG.MIN_ENGLISH_LINES || 2)) return;
+        let sigStartIndex = -1;
+        for (let i = englishLines.length - 1; i >= 0; i--) {
+          const line = englishLines[i].toLowerCase();
+          if ((CONFIG.SIGNATURE_INDICATORS || ['regards','thanks','best','sincerely','kind regards','yours','respectfully']).some(ind => line.includes(ind))) {
+            sigStartIndex = i + 1;
+            break;
+          }
+        }
+        if (sigStartIndex === -1) {
+          sigStartIndex = Math.max(0, englishLines.length - (CONFIG.MAX_SIGNATURE_LINES || 10));
+        }
+        const signatureLines = englishLines.slice(sigStartIndex);
+        if (signatureLines.length > 2) {
+          signatures.push(signatureLines.join('\n'));
+        }
+      });
+      return signatures.filter(sig => sig.length > (CONFIG.MIN_SIGNATURE_LENGTH || 20));
+    }
+
+    function parseSignature(signature, fromHeader = '') {
+      if (!signature) return {};
+      const rawSignature = signature;
+      signature = signature
+        .replace(/\[.*?image.*?\]/gi, '')
+        .replace(/\*+/g, '')
+        .replace(/\r?\n{2,}/g, '\n')
+        .trim();
+      const lines = signature.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+
+      const contact = {
+        rawSignature,
+        company: '',
+        sector: '',
+        industry: '',
+        name: '',
+        title: '',
+        email: '',
+        phone: '',
+        phone2: '',
+        website: '',
+        linkedin: '',
+        address: '',
+        notes: ''
+      };
+
+      // Email
+      for (const line of lines) {
+        const emailMatch = line.match(CONFIG.PATTERNS.EMAIL);
+        if (emailMatch) { contact.email = emailMatch[0].toLowerCase(); break; }
+      }
+
+      // Phones
+      const phoneMatches = [];
+      for (const line of lines) {
+        let match;
+        while ((match = CONFIG.PATTERNS.PHONE.exec(line)) !== null) {
+          phoneMatches.push(normalizePhone(match[0]));
+        }
+      }
+      if (phoneMatches.length > 0) contact.phone = phoneMatches[0];
+      if (phoneMatches.length > 1) contact.phone2 = phoneMatches[1];
+
+      // URLs and LinkedIn
+      for (const line of lines) {
+        let match;
+        while ((match = CONFIG.PATTERNS.URL.exec(line)) !== null) {
+          let url = match[0].replace(/[>\]]/g, '');
+          if (url.startsWith('www.')) url = 'https://' + url;
+          const isExcluded = (CONFIG.EXCLUDED_DOMAINS || []).some(d => url.toLowerCase().includes(d));
+          if (isExcluded) {
+            if (/linkedin/i.test(url)) contact.linkedin = url;
+            continue;
+          }
+          if (!contact.website && isCompanyWebsite(url)) contact.website = url;
+        }
+      }
+
+      // Name
+      for (const line of lines) {
+        if ((CONFIG.NAME_PATTERNS || []).some(p => p.test(line)) &&
+            isEnglishText(line) &&
+            !line.includes('@') &&
+            !CONFIG.PATTERNS.PHONE.test(line) &&
+            !CONFIG.PATTERNS.URL.test(line)) {
+          contact.name = line; break;
+        }
+      }
+      if (!contact.name && fromHeader) {
+        const m = fromHeader.match(/^"?([^"<>]+)"?\s*</);
+        if (m) {
+          const headerName = m[1].trim();
+          if (isEnglishText(headerName)) contact.name = headerName;
+        }
+      }
+
+      // Title
+      if (contact.name) {
+        const idx = lines.indexOf(contact.name);
+        for (let i = idx + 1; i < lines.length; i++) {
+          const line = lines[i];
+          if (line !== contact.email &&
+              line !== contact.phone &&
+              !CONFIG.PATTERNS.URL.test(line) &&
+              !CONFIG.PATTERNS.PHONE.test(line) &&
+              isEnglishText(line)) { contact.title = line; break; }
+        }
+      } else {
+        for (const line of lines) {
+          if ((CONFIG.TITLE_PATTERNS || []).some(p => p.test(line)) &&
+              isEnglishText(line) &&
+              !line.includes('@') &&
+              !CONFIG.PATTERNS.PHONE.test(line) &&
+              !CONFIG.PATTERNS.URL.test(line)) { contact.title = line; break; }
+        }
+      }
+
+      // Company from domain fallback
+      if (!contact.company && contact.email) {
+        const domain = contact.email.split('@')[1];
+        if (domain && !(CONFIG.COMMON_EMAIL_PROVIDERS || []).some(p => domain.includes(p))) {
+          contact.company = toTitleCase(domain.split('.')[0]);
+        }
+      }
+
+      // Address
+      const addressLines = lines.filter(line => {
+        const isOther = [contact.name, contact.title, contact.email, contact.phone].includes(line);
+        const hasKeywords = (CONFIG.ADDRESS_KEYWORDS || /\b(dubai|uae|abu dhabi|sharjah|street|road|tower|building|floor|suite|po box|city|district)\b/i).test(line);
+        const hasNumbers = /\d/.test(line);
+        const notUrl = !CONFIG.PATTERNS.URL.test(line);
+        const english = isEnglishText(line);
+        const notExcluded = !(CONFIG.EXCLUDED_DOMAINS || []).some(d => line.toLowerCase().includes(d));
+        return !isOther && (hasKeywords || hasNumbers) && notUrl && english && notExcluded;
+      });
+      contact.address = addressLines.join(', ');
+
+      return contact;
+    }
+
+    function isCompanyWebsite(url) {
+      try {
+        const urlObj = new URL(url.startsWith('http') ? url : 'https://' + url);
+        const hostname = urlObj.hostname.toLowerCase();
+        if ((CONFIG.EXCLUDED_DOMAINS || []).some(d => hostname.includes(d))) return false;
+        if ((CONFIG.NON_COMPANY_DOMAINS || []).some(d => hostname.includes(d))) return false;
+        return hostname.split('.').length >= 2;
+      } catch { return false; }
+    }
+
+    function normalizePhone(number) {
+      if (!number) return '';
+      number = number.replace(/[^\d\+]/g, '');
+      if (!number.startsWith('+')) number = (CONFIG.DEFAULT_COUNTRY_CODE || '+971') + number;
+      return number;
+    }
+
+    function toTitleCase(str) {
+      if (!str) return '';
+      return str.replace(/\b\w+/g, t => t.charAt(0).toUpperCase() + t.substr(1).toLowerCase());
+    }
+
+    function cleanSignatureForDisplay(signature) {
+      if (!signature) return '';
+      return signature
+        .replace(/\[.*?image.*?\]/gi, '')
+        .replace(/\*+/g, '')
+        .replace(/\r?\n{2,}/g, '\n')
+        .replace(/\n/g, '<br>')
+        .trim();
+    }
+
+    function createContactCard(contact, index) {
+      const card = document.createElement('div');
+      card.className = 'contact-card fade-in';
+      card.style.animationDelay = `${index * 0.05}s`;
+      const contactNumber = `CONTACT ${(index + 1).toString().padStart(2, '0')}`;
+
+      card.innerHTML = `
+        <div class="contact-header">
+          <div class="contact-number">${contactNumber}</div>
+          ${contact.name ? `<div class="contact-name">${contact.name}</div>` : ''}
+          ${contact.title ? `<div class="contact-title">${contact.title}</div>` : ''}
+          ${contact.company ? `<div class="contact-company">${contact.company}</div>` : ''}
+        </div>
+
+        <div class="contact-details">
+          ${contact.email ? `
+            <div class="contact-detail-item">
+              <div class="detail-label">EMAIL</div>
+              <div class="detail-value">${contact.email}</div>
+            </div>` : ''}
+
+          ${contact.phone ? `
+            <div class="contact-detail-item">
+              <div class="detail-label">PHONE</div>
+              <div class="detail-value">${contact.phone}</div>
+            </div>` : ''}
+
+          ${contact.phone2 ? `
+            <div class="contact-detail-item">
+              <div class="detail-label">PHONE 2</div>
+              <div class="detail-value">${contact.phone2}</div>
+            </div>` : ''}
+
+          ${contact.website ? `
+            <div class="contact-detail-item">
+              <div class="detail-label">WEBSITE</div>
+              <div class="detail-value"><a href="${contact.website}" target="_blank">${contact.website}</a></div>
+            </div>` : ''}
+
+          ${contact.address ? `
+            <div class="contact-detail-item">
+              <div class="detail-label">LOCATION</div>
+              <div class="detail-value">
+                <a href="https://maps.google.com/?q=${encodeURIComponent(contact.address)}" target="_blank">
+                  ${contact.address.length > 60 ? contact.address.substring(0, 60) + '...' : contact.address}
+                </a>
+              </div>
+            </div>` : ''}
+        </div>
+
+        ${contact.rawSignature ? `
+          <div class="signature-preview">
+            <div class="preview-label">SIGNATURE PREVIEW</div>
+            <div class="preview-text">${cleanSignatureForDisplay(contact.rawSignature).substring(0, 180)}${contact.rawSignature.length > 180 ? '...' : ''}</div>
+          </div>` : ''}
+
+        <button class="contact-action-button" onclick="openEditForm(${index})">
+          <span class="button-text">EDIT & SAVE</span>
+        </button>
+      `;
+      return card;
+    }
+
+    function renderContacts(contacts) {
+      const stats = document.getElementById('statsSection');
+      const statsText = document.getElementById('statsText');
+      const grid = document.getElementById('contactsContainer');
+      if (!contacts || contacts.length === 0) {
+        stats.style.display = 'none';
+        grid.innerHTML = '';
+        return;
+      }
+      statsText.textContent = contacts.length === 1 ? 'FOUND 1 SIGNATURE' : `FOUND ${contacts.length} SIGNATURES`;
+      stats.style.display = 'block';
+      grid.innerHTML = '';
+      contacts.forEach((c, i) => grid.appendChild(createContactCard(c, i)));
+    }
+
+    function openEditForm(index) {
+      const contact = currentContacts[index];
+      if (!contact) return;
+      currentEditingContact = contact;
+      // Fill form
+      document.getElementById('company').value = contact.company || '';
+      document.getElementById('sector').value = contact.sector || '';
+      document.getElementById('industry').value = contact.industry || '';
+      document.getElementById('name').value = contact.name || '';
+      document.getElementById('title').value = contact.title || '';
+      document.getElementById('email').value = contact.email || '';
+      document.getElementById('phone').value = contact.phone || '';
+      document.getElementById('phone2').value = contact.phone2 || '';
+      document.getElementById('website').value = contact.website || '';
+      document.getElementById('linkedin').value = contact.linkedin || '';
+      document.getElementById('address').value = contact.address || '';
+      document.getElementById('notes').value = contact.notes || '';
+      // Show modal
+      const modal = document.getElementById('editModal');
+      modal.style.display = 'flex';
+      modal.classList.add('fade-in');
+      setTimeout(() => {
+        const firstInput = modal.querySelector('input, select, textarea');
+        if (firstInput) firstInput.focus();
+      }, 200);
+    }
+
+    function closeEditModal() {
+      const modal = document.getElementById('editModal');
+      modal.style.display = 'none';
+      modal.classList.remove('fade-in');
+      currentEditingContact = null;
+    }
+
+    async function saveContact() {
+      try {
+        if (!currentEditingContact) {
+          showMessage('No contact selected', 'error');
+          return;
+        }
+        const data = {
+          company: document.getElementById('company').value.trim(),
+          sector: document.getElementById('sector').value,
+          industry: document.getElementById('industry').value,
+          name: document.getElementById('name').value.trim(),
+          title: document.getElementById('title').value.trim(),
+          email: document.getElementById('email').value.trim(),
+          phone: document.getElementById('phone').value.trim(),
+          phone2: document.getElementById('phone2').value.trim(),
+          website: document.getElementById('website').value.trim(),
+          linkedin: document.getElementById('linkedin').value.trim(),
+          address: document.getElementById('address').value.trim(),
+          notes: document.getElementById('notes').value.trim()
+        };
+        if (!data.email && !data.name) {
+          showMessage('Please provide at least an email or name', 'error');
+          return;
+        }
+        const saveBtn = document.getElementById('saveButton');
+        const prev = saveBtn.innerHTML;
+        saveBtn.innerHTML = '<span class="button-text">SAVING...</span>';
+        saveBtn.disabled = true;
+
+        const resp = await fetch(CONFIG.GOOGLE_APPS_SCRIPT_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'saveContact',
+            contact: data,
+            addedBy: 'paste-tool@local',
+            timestamp: new Date().toISOString()
+          })
+        });
+        const result = await resp.json();
+        if (result.success) {
+          showMessage(`Contact ${data.name || data.email} saved!`, 'success');
+          setBanner('Saved to Google Sheet and team notified.', 'success');
+          closeEditModal();
+          // Fire notification
+          fetch(CONFIG.GOOGLE_APPS_SCRIPT_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'sendNotification',
+              contact: data,
+              actionType: 'added',
+              addedBy: 'paste-tool@local',
+              timestamp: new Date().toISOString()
+            })
+          }).catch(()=>{});
+        } else {
+          showMessage(result.error || 'Failed to save contact', 'error');
+          setBanner(result.error || 'Failed to save contact', 'error');
+        }
+        saveBtn.innerHTML = prev;
+        saveBtn.disabled = false;
+      } catch (err) {
+        console.error(err);
+        showMessage('Network or server error while saving', 'error');
+        setBanner('Network or server error while saving', 'error');
+        const saveBtn = document.getElementById('saveButton');
+        if (saveBtn) { saveBtn.innerHTML = '<span class="button-text">💾 SAVE CONTACT</span>'; saveBtn.disabled = false; }
+      }
+    }
+
+    // Extract button handler
+    document.getElementById('extractButton').addEventListener('click', () => {
+      const raw = document.getElementById('manualSignatureInput').value.trim();
+      if (!raw) {
+        setBanner('Please paste a signature first.', 'warning');
+        return;
+      }
+      const sigs = extractSignaturesFromMessage(raw);
+      // If the whole content looks like a signature and split found nothing, fallback to raw
+      const candidates = sigs.length > 0 ? sigs : [raw];
+      const contacts = [];
+      const seen = new Set();
+      candidates.forEach(txt => {
+        const c = parseSignature(txt);
+        if ((c.email || c.name) && (!c.email || !seen.has((c.email||'').toLowerCase()))) {
+          if (c.email) seen.add(c.email.toLowerCase());
+          contacts.push(c);
+        }
+      });
+      currentContacts = contacts;
+      if (contacts.length === 0) {
+        setBanner('No contact details detected. Try selecting only the signature block.', 'warning');
+      } else {
+        setBanner(`Extracted ${contacts.length} contact${contacts.length>1?'s':''}.`, 'success');
+      }
+      renderContacts(contacts);
+    });
+
+    // Clear button
+    document.getElementById('clearButton').addEventListener('click', () => {
+      document.getElementById('manualSignatureInput').value = '';
+      currentContacts = [];
+      renderContacts([]);
+      setBanner('Cleared.', 'success');
+    });
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const modal = document.getElementById('editModal');
+        if (modal.style.display === 'flex') closeEditModal();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        const modal = document.getElementById('editModal');
+        if (modal.style.display === 'flex') saveContact();
+      }
+    });
+  </script>
+</body>
+</html>
