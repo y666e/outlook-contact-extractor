@@ -6,711 +6,635 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Contact Extractor Pro — Paste & Save</title>
 
-  <!-- Use same CSS and config as the Outlook add-in -->
-  <link rel="stylesheet" type="text/css" href="taskpane.css" />
+  <!-- Config (points to your GAS backend and options) -->
   <script type="text/javascript" src="config.js"></script>
 
+  <!-- Embedded Glassmorphism Styling (matches notification email look) -->
   <style>
-    /* Page wrapper to mimic taskpane but centered and wider */
-    .page-wrapper {
-      max-width: 860px;
-      margin: 0 auto;
-      padding: 24px;
+    :root{
+      --bg0:#000000; --bg1:#1a1a1a;
+      --glass-border: rgba(255,255,255,0.10);
+      --glass-fill: rgba(255,255,255,0.02);
+      --subglass-fill: rgba(255,255,255,0.03);
+      --line: rgba(255,255,255,0.05);
+      --sep: rgba(255,255,255,0.08);
+      --text-strong:#ffffff;
+      --text:#eaeaea;
+      --text-dim: rgba(255,255,255,0.70);
+      --text-faint: rgba(255,255,255,0.50);
+      --accent:#0F9D58;
+      --accent2:#0D7A44;
+      --blue:#2E86AB;
+      --warn:#F39C12;
+      --err:#E74C3C;
+      --ok:#0F9D58;
     }
-    .brand-bar {
-      text-align: center;
-      margin-bottom: 16px;
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%}
+    body{
+      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+      background:linear-gradient(135deg,var(--bg0) 0%,var(--bg1) 100%);
+      color:var(--text);
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
     }
-    .brand-title {
-      color: #ffffff;
-      font-size: 18px;
-      font-weight: 300;
-      letter-spacing: 2px;
-      margin-bottom: 6px;
+    a{color:var(--accent);text-decoration:none}
+    a:hover{text-decoration:underline}
+
+    /* Main shell (matches email) */
+    .shell{
+      min-height:100vh;
+      padding:40px 20px;
+      display:flex;
+      align-items:flex-start;
+      justify-content:center;
     }
-    .brand-sub {
-      color: rgba(255,255,255,0.6);
-      font-size: 11px;
-      letter-spacing: 1px;
+    .card{
+      width:100%;
+      max-width:960px;
+      background:var(--glass-fill);
+      border:1px solid var(--glass-border);
+      border-radius:24px;
+      backdrop-filter:blur(20px);
+      overflow:hidden;
+      box-shadow:0 10px 40px rgba(0,0,0,0.35);
+      animation:fadeIn .35s ease-out both;
     }
 
-    /* Wider manual input section */
-    .manual-input-section {
-      max-width: 860px;
-      margin-left: auto;
-      margin-right: auto;
+    /* Header (matches email header) */
+    .card__header{
+      padding:40px 40px 30px;
+      text-align:center;
+      background:linear-gradient(135deg, rgba(15,157,88,0.10) 0%, rgba(13,122,68,0.10) 100%);
+      border-bottom:1px solid var(--line);
+    }
+    .title{
+      color:var(--text-strong);
+      font-size:24px;
+      font-weight:300;
+      letter-spacing:2px;
+      margin-bottom:8px;
+    }
+    .title-line{
+      width:60px; height:1px;
+      margin:0 auto;
+      background:linear-gradient(90deg, transparent, var(--accent), transparent);
+    }
+    .subtitle{
+      margin-top:8px;
+      color:var(--text-dim);
+      font-size:12px;
+      font-weight:300;
+      letter-spacing:1px;
     }
 
-    /* Contact grid wider */
-    .contacts-container {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
-    }
-    @media (max-width: 840px) {
-      .contacts-container {
-        grid-template-columns: 1fr;
-      }
+    /* Body */
+    .card__body{ padding:40px; }
+    .grid{ display:grid; gap:24px; }
+    @media (min-width:900px){
+      .grid-2{ grid-template-columns:1fr 1fr; }
+      .grid-3{ grid-template-columns:1fr 1fr 1fr; }
     }
 
-    /* Buttons row */
-    .buttons-row {
-      display: flex;
-      gap: 12px;
-      margin-top: 12px;
+    /* Blocks styled like the email sections */
+    .block{
+      background:var(--subglass-fill);
+      border:1px solid var(--line);
+      border-radius:16px;
+      padding:20px;
+    }
+    .block--accent{
+      background:rgba(15,157,88,0.10);
+      border-color:rgba(15,157,88,0.20);
+    }
+    .block--error{
+      background:rgba(231,76,60,0.10);
+      border-color:rgba(231,76,60,0.30);
+    }
+    .block__title{
+      color:var(--text-dim);
+      font-size:11px;
+      letter-spacing:1px;
+      font-weight:600;
+      margin-bottom:10px;
+      text-transform:uppercase;
     }
 
-    /* Footer note */
-    .footer-note {
-      margin-top: 24px;
-      color: rgba(255,255,255,0.5);
-      font-size: 11px;
-      text-align: center;
+    /* Manual input matches email typography */
+    .textarea{
+      width:100%;
+      min-height:140px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,0.04);
+      color:var(--text);
+      border-radius:12px;
+      padding:14px;
+      font-size:13px;
+      line-height:1.45;
+      outline:none;
+      transition:border .2s, background .2s;
+    }
+    .textarea:focus{
+      border-color:var(--accent);
+      background:rgba(255,255,255,0.06);
     }
 
-    /* Success/Error banners */
-    .banner {
-      margin: 12px 0;
-      padding: 12px 16px;
-      border-radius: 8px;
-      font-size: 12px;
+    /* Buttons */
+    .btn{
+      appearance:none;
+      border:none;
+      border-radius:10px;
+      padding:12px 18px;
+      font-size:12px;
+      letter-spacing:0.5px;
+      cursor:pointer;
+      transition:all .25s ease;
     }
-    .banner-success {
-      background: rgba(15, 157, 88, 0.1);
-      border: 1px solid rgba(15, 157, 88, 0.3);
-      color: #0F9D58;
+    .btn--primary{
+      background:linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+      color:white;
+      border:1px solid rgba(15,157,88,0.30);
+      text-transform:uppercase;
+      font-weight:600;
     }
-    .banner-error {
-      background: rgba(231, 76, 60, 0.1);
-      border: 1px solid rgba(231, 76, 60, 0.3);
-      color: #E74C3C;
+    .btn--primary:hover{
+      transform:translateY(-1px);
+      box-shadow:0 8px 20px rgba(15,157,88,0.30);
     }
-    .banner-warning {
-      background: rgba(243, 156, 18, 0.1);
-      border: 1px solid rgba(243, 156, 18, 0.3);
-      color: #F39C12;
+    .btn--ghost{
+      background:rgba(255,255,255,0.05);
+      color:var(--text);
+      border:1px solid var(--line);
     }
+    .btn--ghost:hover{
+      background:rgba(255,255,255,0.08);
+      border-color:rgba(255,255,255,0.2);
+    }
+    .btn-row{ display:flex; gap:12px; flex-wrap:wrap; }
+
+    /* Contact card (matches email “rows” look) */
+    .contact{
+      background:rgba(255,255,255,0.02);
+      border:1px solid var(--line);
+      border-radius:16px;
+      padding:20px;
+    }
+    .contact__head{
+      margin-bottom:12px;
+    }
+    .contact__kicker{
+      color:rgba(46,134,171,0.80);
+      font-size:10px;
+      letter-spacing:1px;
+      font-weight:600;
+      margin-bottom:8px;
+    }
+    .contact__name{ color:var(--text-strong); font-size:16px; }
+    .contact__title{ color:var(--text-dim); font-size:12px; margin-top:2px; }
+    .contact__company{ color:var(--text-faint); font-size:11px; margin-top:4px; }
+
+    .row{
+      padding:14px 16px;
+      border:1px solid rgba(255,255,255,0.05);
+      border-radius:12px;
+      background:rgba(255,255,255,0.01);
+    }
+    .row__label{
+      color:rgba(15,157,88,0.85);
+      font-size:10px; letter-spacing:1px;
+      font-weight:600; margin-bottom:6px;
+      text-transform:uppercase;
+    }
+    .row__value{ color:var(--text); font-size:13px; word-break:break-word; }
+    .sep{ height:1px; background:linear-gradient(90deg, transparent, var(--sep), transparent); margin:16px 0; }
+
+    /* Modal (same feel as email with blur) */
+    .modal{
+      position:fixed; inset:0;
+      display:none; align-items:center; justify-content:center;
+      background:rgba(0,0,0,0.6);
+      backdrop-filter:blur(5px);
+      z-index:50;
+      padding:16px;
+    }
+    .modal__panel{
+      width:100%; max-width:520px;
+      background:var(--glass-fill);
+      border:1px solid var(--glass-border);
+      border-radius:16px;
+      overflow:hidden;
+      animation:pop .25s ease-out both;
+    }
+    .modal__head{
+      text-align:center;
+      padding:22px 20px;
+      background:rgba(46,134,171,0.10);
+      border-bottom:1px solid rgba(46,134,171,0.20);
+    }
+    .modal__title{
+      color:rgba(46,134,171,0.90);
+      font-size:13px; letter-spacing:1px; font-weight:700;
+      text-transform:uppercase; margin-bottom:8px;
+    }
+    .modal__sub{ color:var(--text-dim); font-size:11px; }
+    .modal__body{ padding:20px; display:grid; gap:14px; }
+    .field label{
+      display:block; color:rgba(15,157,88,0.85);
+      font-size:10px; letter-spacing:1px; font-weight:700;
+      text-transform:uppercase; margin-bottom:6px;
+    }
+    .input, .select, .textarea2{
+      width:100%;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,0.05);
+      color:var(--text);
+      border-radius:10px;
+      padding:10px 12px;
+      font-size:13px;
+      outline:none;
+      transition:all .2s ease;
+    }
+    .input:focus, .select:focus, .textarea2:focus{
+      border-color:var(--accent);
+      background:rgba(255,255,255,0.08);
+    }
+    .textarea2{ min-height:70px; resize:vertical; }
+    .modal__foot{
+      padding:16px; border-top:1px solid var(--line);
+      display:flex; gap:10px; justify-content:flex-end;
+    }
+
+    /* Banners */
+    .banner{
+      border-radius:12px; padding:14px 16px; font-size:12px;
+      border:1px solid var(--line);
+    }
+    .banner--ok{ background:rgba(15,157,88,0.10); border-color:rgba(15,157,88,0.30); color:var(--ok); }
+    .banner--warn{ background:rgba(243,156,18,0.10); border-color:rgba(243,156,18,0.30); color:var(--warn); }
+    .banner--err{ background:rgba(231,76,60,0.10); border-color:rgba(231,76,60,0.30); color:var(--err); }
+
+    /* Footer (matches email footer) */
+    .card__footer{
+      padding:30px 40px;
+      text-align:center;
+      border-top:1px solid var(--line);
+    }
+    .foot-tag{ color:rgba(255,255,255,0.30); font-size:11px; letter-spacing:1px; margin-bottom:10px; }
+    .foot-brand{ color:var(--accent); font-size:12px; font-style:italic; }
+
+    @keyframes fadeIn{ from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:translateY(0);} }
+    @keyframes pop{ from{opacity:0; transform:translateY(8px) scale(.98);} to{opacity:1; transform:translateY(0) scale(1);} }
   </style>
 </head>
-
 <body>
-  <div class="page-wrapper">
-    <!-- Brand -->
-    <div class="brand-bar">
-      <div class="brand-title">CONTACT EXTRACTOR — PASTE & SAVE</div>
-      <div class="header-line" style="margin: 8px auto;"></div>
-      <div class="brand-sub">AI-POWERED EXTRACTION • SAME DATABASE • NO INSTALL</div>
-    </div>
+  <div class="shell">
+    <div class="card">
 
-    <!-- Header card -->
-    <div class="header-section">
-      <div class="header-title">CONTACT EXTRACTOR</div>
-      <div class="header-line"></div>
-      <div class="header-subtitle">AI-POWERED EXTRACTION</div>
-    </div>
-
-    <!-- Status banners -->
-    <div id="statusBanner" class="banner" style="display:none;"></div>
-
-    <!-- Manual Input Section (same style as taskpane, wider) -->
-    <div class="manual-input-section">
-      <div class="manual-input-header">
-        <div class="manual-input-title">MANUAL INPUT</div>
-        <div class="manual-input-subtitle">Paste an email signature and extract all fields</div>
+      <!-- Header like the email -->
+      <div class="card__header">
+        <div class="title">CONTACT EXTRACTOR — PASTE & SAVE</div>
+        <div class="title-line"></div>
+        <div class="subtitle">SAME FUTURISTIC DESIGN • SAME DATABASE • NO INSTALL</div>
       </div>
 
-      <textarea id="manualSignatureInput"
-                class="manual-signature-input"
-                placeholder="Paste the complete signature text here..."
-                rows="6"></textarea>
+      <!-- Body -->
+      <div class="card__body">
 
-      <div class="buttons-row">
-        <button id="extractButton" class="extract-button">
-          <span class="button-text">EXTRACT</span>
-        </button>
-        <button id="clearButton" class="secondary-button">
-          <span class="button-text">CLEAR</span>
-        </button>
+        <!-- Status banner -->
+        <div id="banner" class="banner" style="display:none;"></div>
+
+        <!-- Manual input -->
+        <div class="block">
+          <div class="block__title">Manual Input</div>
+          <textarea id="sig" class="textarea" placeholder="Paste the complete signature text here..."></textarea>
+          <div class="sep"></div>
+          <div class="btn-row">
+            <button id="btnExtract" class="btn btn--primary">Extract</button>
+            <button id="btnClear" class="btn btn--ghost">Clear</button>
+          </div>
+        </div>
+
+        <!-- Stats -->
+        <div id="stats" class="block block--accent" style="display:none;">
+          <div class="block__title">Results</div>
+          <div id="statsText" style="color:var(--ok); font-weight:600; letter-spacing:0.5px;">FOUND 0 SIGNATURES</div>
+          <div style="color:var(--text-dim); font-size:12px; margin-top:6px;">Review and process contacts below</div>
+        </div>
+
+        <!-- Contacts -->
+        <div id="grid" class="grid grid-2"></div>
+
+      </div>
+
+      <!-- Footer like the email -->
+      <div class="card__footer">
+        <div class="foot-tag">CONTACT EXTRACTOR PRO — WEB</div>
+        <div class="foot-brand">Crafted by Youssef El Egaidi</div>
       </div>
     </div>
+  </div>
 
-    <!-- Stats Section -->
-    <div id="statsSection" class="stats-section" style="display: none;">
-      <div class="stats-text" id="statsText">FOUND 0 SIGNATURES</div>
-      <div class="stats-subtitle">Review and process contacts below</div>
-    </div>
-
-    <!-- Contacts Grid -->
-    <div id="contactsContainer" class="contacts-container"></div>
-
-    <!-- Edit Modal (reuse taskpane styles/structure) -->
-    <div id="editModal" class="modal-overlay" style="display: none;">
-      <div class="modal-content">
-        <div class="modal-header">
-          <div class="modal-title">EDIT CONTACT</div>
-          <div class="modal-subtitle">Complete all fields before saving</div>
-          <div class="modal-line"></div>
-        </div>
-
-        <div class="modal-body">
-          <form id="contactForm" class="contact-form">
-            <div class="input-group">
-              <label class="input-label">COMPANY</label>
-              <input type="text" id="company" class="form-input" />
-            </div>
-
-            <div class="input-group">
-              <label class="input-label">SECTOR</label>
-              <select id="sector" class="form-select">
-                <option value="">Select sector...</option>
-                <option value="Government">Government</option>
-                <option value="Semi-government">Semi-government</option>
-                <option value="Private">Private</option>
-              </select>
-            </div>
-
-            <div class="input-group">
-              <label class="input-label">INDUSTRY</label>
-              <select id="industry" class="form-select">
-                <option value="">Select industry...</option>
-                <option value="Accounting, Finance & Banking">Accounting, Finance & Banking</option>
-                <option value="Agriculture, Food & Beverage">Agriculture, Food & Beverage</option>
-                <option value="Arts, Media & Entertainment">Arts, Media & Entertainment</option>
-                <option value="Construction, Real Estate & Infrastructure">Construction, Real Estate & Infrastructure</option>
-                <option value="Consulting, Legal & Professional Services">Consulting, Legal & Professional Services</option>
-                <option value="Consumer Goods, Retail & Hospitality">Consumer Goods, Retail & Hospitality</option>
-                <option value="Education, Training & Non-Profit">Education, Training & Non-Profit</option>
-                <option value="Energy, Utilities & Environmental Services">Energy, Utilities & Environmental Services</option>
-                <option value="Government, Public Policy & International Affairs">Government, Public Policy & International Affairs</option>
-                <option value="Healthcare, Pharmaceuticals & Life Sciences">Healthcare, Pharmaceuticals & Life Sciences</option>
-                <option value="Human Resources & Career Services">Human Resources & Career Services</option>
-                <option value="Information Technology, Software & Digital Services">Information Technology, Software & Digital Services</option>
-                <option value="Logistics, Transportation & Supply Chain">Logistics, Transportation & Supply Chain</option>
-                <option value="Manufacturing & Industrial Engineering">Manufacturing & Industrial Engineering</option>
-                <option value="Marketing, Advertising & Communications">Marketing, Advertising & Communications</option>
-                <option value="Science, Research & Innovation">Science, Research & Innovation</option>
-                <option value="Security, Defense & Aerospace">Security, Defense & Aerospace</option>
-                <option value="Sports, Recreation & Wellness">Sports, Recreation & Wellness</option>
-              </select>
-            </div>
-
-            <div class="input-group">
-              <label class="input-label">NAME</label>
-              <input type="text" id="name" class="form-input" />
-            </div>
-
-            <div class="input-group">
-              <label class="input-label">TITLE</label>
-              <input type="text" id="title" class="form-input" />
-            </div>
-
-            <div class="input-group">
-              <label class="input-label">EMAIL</label>
-              <input type="email" id="email" class="form-input" />
-            </div>
-
-            <div class="input-group">
-              <label class="input-label">PHONE</label>
-              <input type="text" id="phone" class="form-input" />
-            </div>
-
-            <div class="input-group">
-              <label class="input-label">PHONE 2</label>
-              <input type="text" id="phone2" class="form-input" />
-            </div>
-
-            <div class="input-group">
-              <label class="input-label">WEBSITE</label>
-              <input type="url" id="website" class="form-input" />
-            </div>
-
-            <div class="input-group">
-              <label class="input-label">LINKEDIN</label>
-              <input type="url" id="linkedin" class="form-input" />
-            </div>
-
-            <div class="input-group">
-              <label class="input-label">ADDRESS</label>
-              <textarea id="address" class="form-textarea" rows="3"></textarea>
-            </div>
-
-            <div class="input-group">
-              <label class="input-label">NOTES</label>
-              <textarea id="notes" class="form-textarea" rows="3"></textarea>
-            </div>
-          </form>
-        </div>
-
-        <div class="modal-footer">
-          <button id="saveButton" class="save-button" onclick="saveContact()">
-            <span class="button-text">💾 SAVE CONTACT</span>
-          </button>
-          <button id="cancelButton" class="cancel-button" onclick="closeEditModal()">
-            <span class="button-text">❌ CANCEL</span>
-          </button>
-        </div>
+  <!-- Edit Modal -->
+  <div id="modal" class="modal" aria-hidden="true">
+    <div class="modal__panel">
+      <div class="modal__head">
+        <div class="modal__title">Edit Contact</div>
+        <div class="modal__sub">Complete all fields before saving</div>
       </div>
-    </div>
-
-    <!-- Messages -->
-    <div id="messageContainer" class="message-container" style="display:none;">
-      <div id="messageContent" class="message-content"></div>
-    </div>
-
-    <div class="footer-note">
-      Uses the same parser and backend as the Outlook Add-in. All entries go to the same Google Sheet database.
+      <div class="modal__body">
+        <div class="field"><label>Company</label><input id="f_company" class="input" type="text"></div>
+        <div class="field"><label>Sector</label>
+          <select id="f_sector" class="select">
+            <option value="">Select sector...</option>
+            <option>Government</option>
+            <option>Semi-government</option>
+            <option>Private</option>
+          </select>
+        </div>
+        <div class="field"><label>Industry</label>
+          <select id="f_industry" class="select">
+            <option value="">Select industry...</option>
+            <option>Accounting, Finance & Banking</option>
+            <option>Agriculture, Food & Beverage</option>
+            <option>Arts, Media & Entertainment</option>
+            <option>Construction, Real Estate & Infrastructure</option>
+            <option>Consulting, Legal & Professional Services</option>
+            <option>Consumer Goods, Retail & Hospitality</option>
+            <option>Education, Training & Non-Profit</option>
+            <option>Energy, Utilities & Environmental Services</option>
+            <option>Government, Public Policy & International Affairs</option>
+            <option>Healthcare, Pharmaceuticals & Life Sciences</option>
+            <option>Human Resources & Career Services</option>
+            <option>Information Technology, Software & Digital Services</option>
+            <option>Logistics, Transportation & Supply Chain</option>
+            <option>Manufacturing & Industrial Engineering</option>
+            <option>Marketing, Advertising & Communications</option>
+            <option>Science, Research & Innovation</option>
+            <option>Security, Defense & Aerospace</option>
+            <option>Sports, Recreation & Wellness</option>
+          </select>
+        </div>
+        <div class="field"><label>Name</label><input id="f_name" class="input" type="text"></div>
+        <div class="field"><label>Title</label><input id="f_title" class="input" type="text"></div>
+        <div class="field"><label>Email</label><input id="f_email" class="input" type="email"></div>
+        <div class="field"><label>Phone</label><input id="f_phone" class="input" type="text"></div>
+        <div class="field"><label>Phone 2</label><input id="f_phone2" class="input" type="text"></div>
+        <div class="field"><label>Website</label><input id="f_website" class="input" type="url"></div>
+        <div class="field"><label>LinkedIn</label><input id="f_linkedin" class="input" type="url"></div>
+        <div class="field"><label>Address</label><textarea id="f_address" class="textarea2"></textarea></div>
+        <div class="field"><label>Notes</label><textarea id="f_notes" class="textarea2"></textarea></div>
+      </div>
+      <div class="modal__foot">
+        <button id="btnSave" class="btn btn--primary">💾 Save Contact</button>
+        <button id="btnCancel" class="btn btn--ghost">❌ Cancel</button>
+      </div>
     </div>
   </div>
 
   <script>
-    // Reuse most logic from taskpane.js (trimmed to essential parts for web use)
-
-    let currentContacts = [];
-    let currentEditingContact = null;
-
-    function setBanner(text, type='success') {
-      const el = document.getElementById('statusBanner');
-      el.className = 'banner ' + (type === 'success' ? 'banner-success' : type === 'error' ? 'banner-error' : 'banner-warning');
-      el.textContent = text;
-      el.style.display = 'block';
-      setTimeout(() => { el.style.display = 'none'; }, 5000);
+    // ——— Utility (banner + messages) ———
+    const banner = document.getElementById('banner');
+    function showBanner(text, kind='ok'){
+      banner.className='banner '+(kind==='ok'?'banner--ok':kind==='warn'?'banner--warn':'banner--err');
+      banner.textContent=text; banner.style.display='block';
+      setTimeout(()=>banner.style.display='none', 5000);
     }
 
-    function showMessage(message, type = 'success') {
-      const container = document.getElementById('messageContainer');
-      const content = document.getElementById('messageContent');
-      content.className = 'message-content';
-      content.classList.add('message-' + type);
-      content.textContent = message;
-      container.style.display = 'block';
-      container.classList.add('fade-in');
-      setTimeout(() => {
-        container.style.display = 'none';
-        container.classList.remove('fade-in');
-      }, CONFIG.MESSAGE_DISPLAY_DURATION || 5000);
+    function isEnglishText(text){
+      if(!text) return false;
+      const cleaned = text.replace(/[^a-zA-Z\u0600-\u06FF\u4e00-\u9fff\u3400-\u4dbf]/g,'');
+      if(cleaned.length===0) return true;
+      const eng=(cleaned.match(/[a-zA-Z]/g)||[]).length;
+      return eng/cleaned.length > (CONFIG.ENGLISH_THRESHOLD||0.7);
     }
 
-    function isEnglishText(text) {
-      if (!text || text.length === 0) return false;
-      const textForAnalysis = text.replace(/[^a-zA-Z\u0600-\u06FF\u4e00-\u9fff\u3400-\u4dbf]/g, '');
-      if (textForAnalysis.length === 0) return true;
-      const englishChars = (textForAnalysis.match(/[a-zA-Z]/g) || []).length;
-      const totalChars = textForAnalysis.length;
-      return (englishChars / totalChars) > (CONFIG.ENGLISH_THRESHOLD || 0.7);
-    }
-
-    function extractSignaturesFromMessage(body) {
-      if (!body || typeof body !== 'string') return [];
-      let cleaned = body
-        .replace(/\[.*?image.*?\]/gi, '')
-        .replace(/\r?\n{2,}/g, '\n')
-        .trim();
-      const signatures = [];
-      const messageBlocks = cleaned.split(/\nOn .* wrote:|\n---|\n______|\nFrom:|\nSent:|\n> |\n\*|\nReply|\nForward/i);
-      messageBlocks.forEach(block => {
-        const lines = block.split(/\n/).map(l => l.trim()).filter(l => l.length > 0);
-        const englishLines = lines.filter(line => isEnglishText(line));
-        if (englishLines.length < (CONFIG.MIN_ENGLISH_LINES || 2)) return;
-        let sigStartIndex = -1;
-        for (let i = englishLines.length - 1; i >= 0; i--) {
-          const line = englishLines[i].toLowerCase();
-          if ((CONFIG.SIGNATURE_INDICATORS || ['regards','thanks','best','sincerely','kind regards','yours','respectfully']).some(ind => line.includes(ind))) {
-            sigStartIndex = i + 1;
-            break;
-          }
+    function extractBlocks(body){
+      if(!body||typeof body!=='string') return [];
+      let cleaned = body.replace(/\[.*?image.*?\]/gi,'').replace(/\r?\n{2,}/g,'\n').trim();
+      const out=[], parts = cleaned.split(/\nOn .* wrote:|\n---|\n______|\nFrom:|\nSent:|\n> |\n\*|\nReply|\nForward/i);
+      parts.forEach(b=>{
+        const lines=b.split(/\n/).map(x=>x.trim()).filter(Boolean);
+        const eng=lines.filter(isEnglishText);
+        if(eng.length < (CONFIG.MIN_ENGLISH_LINES||2)) return;
+        let idx=-1;
+        for(let i=eng.length-1;i>=0;i--){
+          const s=eng[i].toLowerCase();
+          if((CONFIG.SIGNATURE_INDICATORS||['regards','thanks','best','sincerely','kind regards','yours','respectfully']).some(k=>s.includes(k))){ idx=i+1; break; }
         }
-        if (sigStartIndex === -1) {
-          sigStartIndex = Math.max(0, englishLines.length - (CONFIG.MAX_SIGNATURE_LINES || 10));
-        }
-        const signatureLines = englishLines.slice(sigStartIndex);
-        if (signatureLines.length > 2) {
-          signatures.push(signatureLines.join('\n'));
-        }
+        if(idx===-1) idx=Math.max(0, eng.length-(CONFIG.MAX_SIGNATURE_LINES||10));
+        const sig=eng.slice(idx);
+        if(sig.length>2) out.push(sig.join('\n'));
       });
-      return signatures.filter(sig => sig.length > (CONFIG.MIN_SIGNATURE_LENGTH || 20));
+      return out.filter(s=>s.length>(CONFIG.MIN_SIGNATURE_LENGTH||20));
     }
 
-    function parseSignature(signature, fromHeader = '') {
-      if (!signature) return {};
-      const rawSignature = signature;
-      signature = signature
-        .replace(/\[.*?image.*?\]/gi, '')
-        .replace(/\*+/g, '')
-        .replace(/\r?\n{2,}/g, '\n')
-        .trim();
-      const lines = signature.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+    function isCompanyWebsite(url){
+      try{
+        const u = new URL(url.startsWith('http')?url:'https://'+url);
+        const h=u.hostname.toLowerCase();
+        if((CONFIG.EXCLUDED_DOMAINS||[]).some(d=>h.includes(d))) return false;
+        if((CONFIG.NON_COMPANY_DOMAINS||[]).some(d=>h.includes(d))) return false;
+        return h.split('.').length>=2;
+      }catch{return false;}
+    }
 
-      const contact = {
-        rawSignature,
-        company: '',
-        sector: '',
-        industry: '',
-        name: '',
-        title: '',
-        email: '',
-        phone: '',
-        phone2: '',
-        website: '',
-        linkedin: '',
-        address: '',
-        notes: ''
-      };
+    function normalizePhone(n){
+      if(!n) return '';
+      n=n.replace(/[^\d\+]/g,'');
+      if(!n.startsWith('+')) n=(CONFIG.DEFAULT_COUNTRY_CODE||'+971')+n;
+      return n;
+    }
 
-      // Email
-      for (const line of lines) {
-        const emailMatch = line.match(CONFIG.PATTERNS.EMAIL);
-        if (emailMatch) { contact.email = emailMatch[0].toLowerCase(); break; }
+    function toTitleCase(s){return s? s.replace(/\b\w+/g,t=>t[0].toUpperCase()+t.slice(1).toLowerCase()):''}
+
+    function parseSignature(signature, fromHeader=''){
+      if(!signature) return {};
+      const rawSignature=signature;
+      signature=signature.replace(/\[.*?image.*?\]/gi,'').replace(/\*+/g,'').replace(/\r?\n{2,}/g,'\n').trim();
+      const lines=signature.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+      const c={rawSignature,company:'',sector:'',industry:'',name:'',title:'',email:'',phone:'',phone2:'',website:'',linkedin:'',address:'',notes:''};
+
+      // email
+      for(const ln of lines){ const m=ln.match(CONFIG.PATTERNS.EMAIL); if(m){ c.email=m[0].toLowerCase(); break; } }
+      // phones
+      const phones=[]; for(const ln of lines){ let m; while((m=CONFIG.PATTERNS.PHONE.exec(ln))!==null){ phones.push(normalizePhone(m[0])); } }
+      if(phones[0]) c.phone=phones[0]; if(phones[1]) c.phone2=phones[1];
+      // urls
+      for(const ln of lines){ let m; while((m=CONFIG.PATTERNS.URL.exec(ln))!==null){ let url=m[0].replace(/[>\]]/g,''); if(url.startsWith('www.')) url='https://'+url;
+        const excluded=(CONFIG.EXCLUDED_DOMAINS||[]).some(d=>url.toLowerCase().includes(d));
+        if(excluded){ if(/linkedin/i.test(url)) c.linkedin=url; continue; }
+        if(!c.website && isCompanyWebsite(url)) c.website=url;
+      } }
+      // name
+      for(const ln of lines){
+        if((CONFIG.NAME_PATTERNS||[]).some(p=>p.test(ln)) && isEnglishText(ln) && !ln.includes('@') && !CONFIG.PATTERNS.PHONE.test(ln) && !CONFIG.PATTERNS.URL.test(ln)){ c.name=ln; break; }
       }
-
-      // Phones
-      const phoneMatches = [];
-      for (const line of lines) {
-        let match;
-        while ((match = CONFIG.PATTERNS.PHONE.exec(line)) !== null) {
-          phoneMatches.push(normalizePhone(match[0]));
-        }
-      }
-      if (phoneMatches.length > 0) contact.phone = phoneMatches[0];
-      if (phoneMatches.length > 1) contact.phone2 = phoneMatches[1];
-
-      // URLs and LinkedIn
-      for (const line of lines) {
-        let match;
-        while ((match = CONFIG.PATTERNS.URL.exec(line)) !== null) {
-          let url = match[0].replace(/[>\]]/g, '');
-          if (url.startsWith('www.')) url = 'https://' + url;
-          const isExcluded = (CONFIG.EXCLUDED_DOMAINS || []).some(d => url.toLowerCase().includes(d));
-          if (isExcluded) {
-            if (/linkedin/i.test(url)) contact.linkedin = url;
-            continue;
-          }
-          if (!contact.website && isCompanyWebsite(url)) contact.website = url;
-        }
-      }
-
-      // Name
-      for (const line of lines) {
-        if ((CONFIG.NAME_PATTERNS || []).some(p => p.test(line)) &&
-            isEnglishText(line) &&
-            !line.includes('@') &&
-            !CONFIG.PATTERNS.PHONE.test(line) &&
-            !CONFIG.PATTERNS.URL.test(line)) {
-          contact.name = line; break;
-        }
-      }
-      if (!contact.name && fromHeader) {
-        const m = fromHeader.match(/^"?([^"<>]+)"?\s*</);
-        if (m) {
-          const headerName = m[1].trim();
-          if (isEnglishText(headerName)) contact.name = headerName;
-        }
-      }
-
-      // Title
-      if (contact.name) {
-        const idx = lines.indexOf(contact.name);
-        for (let i = idx + 1; i < lines.length; i++) {
-          const line = lines[i];
-          if (line !== contact.email &&
-              line !== contact.phone &&
-              !CONFIG.PATTERNS.URL.test(line) &&
-              !CONFIG.PATTERNS.PHONE.test(line) &&
-              isEnglishText(line)) { contact.title = line; break; }
-        }
-      } else {
-        for (const line of lines) {
-          if ((CONFIG.TITLE_PATTERNS || []).some(p => p.test(line)) &&
-              isEnglishText(line) &&
-              !line.includes('@') &&
-              !CONFIG.PATTERNS.PHONE.test(line) &&
-              !CONFIG.PATTERNS.URL.test(line)) { contact.title = line; break; }
-        }
-      }
-
-      // Company from domain fallback
-      if (!contact.company && contact.email) {
-        const domain = contact.email.split('@')[1];
-        if (domain && !(CONFIG.COMMON_EMAIL_PROVIDERS || []).some(p => domain.includes(p))) {
-          contact.company = toTitleCase(domain.split('.')[0]);
-        }
-      }
-
-      // Address
-      const addressLines = lines.filter(line => {
-        const isOther = [contact.name, contact.title, contact.email, contact.phone].includes(line);
-        const hasKeywords = (CONFIG.ADDRESS_KEYWORDS || /\b(dubai|uae|abu dhabi|sharjah|street|road|tower|building|floor|suite|po box|city|district)\b/i).test(line);
-        const hasNumbers = /\d/.test(line);
-        const notUrl = !CONFIG.PATTERNS.URL.test(line);
-        const english = isEnglishText(line);
-        const notExcluded = !(CONFIG.EXCLUDED_DOMAINS || []).some(d => line.toLowerCase().includes(d));
-        return !isOther && (hasKeywords || hasNumbers) && notUrl && english && notExcluded;
+      if(!c.name && fromHeader){ const m=fromHeader.match(/^"?([^"<>]+)"?\s*</); if(m){ const nm=m[1].trim(); if(isEnglishText(nm)) c.name=nm; } }
+      // title
+      if(c.name){ const i=lines.indexOf(c.name); for(let k=i+1;k<lines.length;k++){ const ln=lines[k]; if(ln!==c.email && ln!==c.phone && !CONFIG.PATTERNS.URL.test(ln) && !CONFIG.PATTERNS.PHONE.test(ln) && isEnglishText(ln)){ c.title=ln; break; } }
+      } else { for(const ln of lines){ if((CONFIG.TITLE_PATTERNS||[]).some(p=>p.test(ln)) && isEnglishText(ln) && !ln.includes('@') && !CONFIG.PATTERNS.PHONE.test(ln) && !CONFIG.PATTERNS.URL.test(ln)){ c.title=ln; break; } } }
+      // company from email
+      if(!c.company && c.email){ const d=c.email.split('@')[1]; if(d && !(CONFIG.COMMON_EMAIL_PROVIDERS||[]).some(p=>d.includes(p))){ c.company=toTitleCase(d.split('.')[0]); } }
+      // address
+      const addr=lines.filter(ln=>{
+        const isOther=[c.name,c.title,c.email,c.phone].includes(ln);
+        const hasKW=(CONFIG.ADDRESS_KEYWORDS||/\b(dubai|uae|abu dhabi|sharjah|street|road|tower|building|floor|suite|po box|city|district)\b/i).test(ln);
+        const hasNum=/\d/.test(ln);
+        const notUrl=!CONFIG.PATTERNS.URL.test(ln);
+        const eng=isEnglishText(ln);
+        const notExcluded=!((CONFIG.EXCLUDED_DOMAINS||[]).some(d=>ln.toLowerCase().includes(d)));
+        return !isOther && (hasKW||hasNum) && notUrl && eng && notExcluded;
       });
-      contact.address = addressLines.join(', ');
-
-      return contact;
+      c.address=addr.join(', ');
+      return c;
     }
 
-    function isCompanyWebsite(url) {
-      try {
-        const urlObj = new URL(url.startsWith('http') ? url : 'https://' + url);
-        const hostname = urlObj.hostname.toLowerCase();
-        if ((CONFIG.EXCLUDED_DOMAINS || []).some(d => hostname.includes(d))) return false;
-        if ((CONFIG.NON_COMPANY_DOMAINS || []).some(d => hostname.includes(d))) return false;
-        return hostname.split('.').length >= 2;
-      } catch { return false; }
-    }
+    const grid=document.getElementById('grid');
+    const stats=document.getElementById('stats');
+    const statsText=document.getElementById('statsText');
+    let contacts=[]; let editing=null;
 
-    function normalizePhone(number) {
-      if (!number) return '';
-      number = number.replace(/[^\d\+]/g, '');
-      if (!number.startsWith('+')) number = (CONFIG.DEFAULT_COUNTRY_CODE || '+971') + number;
-      return number;
-    }
-
-    function toTitleCase(str) {
-      if (!str) return '';
-      return str.replace(/\b\w+/g, t => t.charAt(0).toUpperCase() + t.substr(1).toLowerCase());
-    }
-
-    function cleanSignatureForDisplay(signature) {
-      if (!signature) return '';
-      return signature
-        .replace(/\[.*?image.*?\]/gi, '')
-        .replace(/\*+/g, '')
-        .replace(/\r?\n{2,}/g, '\n')
-        .replace(/\n/g, '<br>')
-        .trim();
-    }
-
-    function createContactCard(contact, index) {
-      const card = document.createElement('div');
-      card.className = 'contact-card fade-in';
-      card.style.animationDelay = `${index * 0.05}s`;
-      const contactNumber = `CONTACT ${(index + 1).toString().padStart(2, '0')}`;
-
-      card.innerHTML = `
-        <div class="contact-header">
-          <div class="contact-number">${contactNumber}</div>
-          ${contact.name ? `<div class="contact-name">${contact.name}</div>` : ''}
-          ${contact.title ? `<div class="contact-title">${contact.title}</div>` : ''}
-          ${contact.company ? `<div class="contact-company">${contact.company}</div>` : ''}
-        </div>
-
-        <div class="contact-details">
-          ${contact.email ? `
-            <div class="contact-detail-item">
-              <div class="detail-label">EMAIL</div>
-              <div class="detail-value">${contact.email}</div>
-            </div>` : ''}
-
-          ${contact.phone ? `
-            <div class="contact-detail-item">
-              <div class="detail-label">PHONE</div>
-              <div class="detail-value">${contact.phone}</div>
-            </div>` : ''}
-
-          ${contact.phone2 ? `
-            <div class="contact-detail-item">
-              <div class="detail-label">PHONE 2</div>
-              <div class="detail-value">${contact.phone2}</div>
-            </div>` : ''}
-
-          ${contact.website ? `
-            <div class="contact-detail-item">
-              <div class="detail-label">WEBSITE</div>
-              <div class="detail-value"><a href="${contact.website}" target="_blank">${contact.website}</a></div>
-            </div>` : ''}
-
-          ${contact.address ? `
-            <div class="contact-detail-item">
-              <div class="detail-label">LOCATION</div>
-              <div class="detail-value">
-                <a href="https://maps.google.com/?q=${encodeURIComponent(contact.address)}" target="_blank">
-                  ${contact.address.length > 60 ? contact.address.substring(0, 60) + '...' : contact.address}
-                </a>
-              </div>
-            </div>` : ''}
-        </div>
-
-        ${contact.rawSignature ? `
-          <div class="signature-preview">
-            <div class="preview-label">SIGNATURE PREVIEW</div>
-            <div class="preview-text">${cleanSignatureForDisplay(contact.rawSignature).substring(0, 180)}${contact.rawSignature.length > 180 ? '...' : ''}</div>
-          </div>` : ''}
-
-        <button class="contact-action-button" onclick="openEditForm(${index})">
-          <span class="button-text">EDIT & SAVE</span>
-        </button>
-      `;
-      return card;
-    }
-
-    function renderContacts(contacts) {
-      const stats = document.getElementById('statsSection');
-      const statsText = document.getElementById('statsText');
-      const grid = document.getElementById('contactsContainer');
-      if (!contacts || contacts.length === 0) {
-        stats.style.display = 'none';
-        grid.innerHTML = '';
-        return;
-      }
-      statsText.textContent = contacts.length === 1 ? 'FOUND 1 SIGNATURE' : `FOUND ${contacts.length} SIGNATURES`;
-      stats.style.display = 'block';
-      grid.innerHTML = '';
-      contacts.forEach((c, i) => grid.appendChild(createContactCard(c, i)));
-    }
-
-    function openEditForm(index) {
-      const contact = currentContacts[index];
-      if (!contact) return;
-      currentEditingContact = contact;
-      // Fill form
-      document.getElementById('company').value = contact.company || '';
-      document.getElementById('sector').value = contact.sector || '';
-      document.getElementById('industry').value = contact.industry || '';
-      document.getElementById('name').value = contact.name || '';
-      document.getElementById('title').value = contact.title || '';
-      document.getElementById('email').value = contact.email || '';
-      document.getElementById('phone').value = contact.phone || '';
-      document.getElementById('phone2').value = contact.phone2 || '';
-      document.getElementById('website').value = contact.website || '';
-      document.getElementById('linkedin').value = contact.linkedin || '';
-      document.getElementById('address').value = contact.address || '';
-      document.getElementById('notes').value = contact.notes || '';
-      // Show modal
-      const modal = document.getElementById('editModal');
-      modal.style.display = 'flex';
-      modal.classList.add('fade-in');
-      setTimeout(() => {
-        const firstInput = modal.querySelector('input, select, textarea');
-        if (firstInput) firstInput.focus();
-      }, 200);
-    }
-
-    function closeEditModal() {
-      const modal = document.getElementById('editModal');
-      modal.style.display = 'none';
-      modal.classList.remove('fade-in');
-      currentEditingContact = null;
-    }
-
-    async function saveContact() {
-      try {
-        if (!currentEditingContact) {
-          showMessage('No contact selected', 'error');
-          return;
-        }
-        const data = {
-          company: document.getElementById('company').value.trim(),
-          sector: document.getElementById('sector').value,
-          industry: document.getElementById('industry').value,
-          name: document.getElementById('name').value.trim(),
-          title: document.getElementById('title').value.trim(),
-          email: document.getElementById('email').value.trim(),
-          phone: document.getElementById('phone').value.trim(),
-          phone2: document.getElementById('phone2').value.trim(),
-          website: document.getElementById('website').value.trim(),
-          linkedin: document.getElementById('linkedin').value.trim(),
-          address: document.getElementById('address').value.trim(),
-          notes: document.getElementById('notes').value.trim()
-        };
-        if (!data.email && !data.name) {
-          showMessage('Please provide at least an email or name', 'error');
-          return;
-        }
-        const saveBtn = document.getElementById('saveButton');
-        const prev = saveBtn.innerHTML;
-        saveBtn.innerHTML = '<span class="button-text">SAVING...</span>';
-        saveBtn.disabled = true;
-
-        const resp = await fetch(CONFIG.GOOGLE_APPS_SCRIPT_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'saveContact',
-            contact: data,
-            addedBy: 'paste-tool@local',
-            timestamp: new Date().toISOString()
-          })
+    function renderContacts(list){
+      grid.innerHTML='';
+      if(!list.length){ stats.style.display='none'; return; }
+      stats.style.display='block';
+      statsText.textContent = list.length===1? 'FOUND 1 SIGNATURE' : `FOUND ${list.length} SIGNATURES`;
+      list.forEach((c,i)=>{
+        const el=document.createElement('div');
+        el.className='contact';
+        el.innerHTML=`
+          <div class="contact__head">
+            <div class="contact__kicker">CONTACT ${(i+1).toString().padStart(2,'0')}</div>
+            ${c.name?`<div class="contact__name">${c.name}</div>`:''}
+            ${c.title?`<div class="contact__title">${c.title}</div>`:''}
+            ${c.company?`<div class="contact__company">${c.company}</div>`:''}
+          </div>
+          <div class="grid">
+            ${c.email?`<div class="row"><div class="row__label">Email</div><div class="row__value">${c.email}</div></div>`:''}
+            ${c.phone?`<div class="row"><div class="row__label">Phone</div><div class="row__value">${c.phone}</div></div>`:''}
+            ${c.phone2?`<div class="row"><div class="row__label">Phone 2</div><div class="row__value">${c.phone2}</div></div>`:''}
+            ${c.website?`<div class="row"><div class="row__label">Website</div><div class="row__value"><a href="${c.website}" target="_blank">${c.website}</a></div></div>`:''}
+            ${c.address?`<div class="row"><div class="row__label">Location</div><div class="row__value"><a href="https://maps.google.com/?q=${encodeURIComponent(c.address)}" target="_blank">${c.address}</a></div></div>`:''}
+          </div>
+          ${c.rawSignature?`
+            <div class="sep"></div>
+            <div class="row">
+              <div class="row__label">Signature Preview</div>
+              <div class="row__value" style="color:rgba(255,255,255,0.65); font-size:12px;">${c.rawSignature.replace(/\n/g,'<br>')}</div>
+            </div>`:''}
+          <div class="sep"></div>
+          <div class="btn-row">
+            <button class="btn btn--primary" data-edit="${i}">✏️ Edit & Save</button>
+          </div>
+        `;
+        grid.appendChild(el);
+      });
+      grid.querySelectorAll('[data-edit]').forEach(btn=>{
+        btn.addEventListener('click',()=>{
+          const idx=+btn.getAttribute('data-edit');
+          openEditor(list[idx]);
         });
-        const result = await resp.json();
-        if (result.success) {
-          showMessage(`Contact ${data.name || data.email} saved!`, 'success');
-          setBanner('Saved to Google Sheet and team notified.', 'success');
-          closeEditModal();
-          // Fire notification
-          fetch(CONFIG.GOOGLE_APPS_SCRIPT_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              action: 'sendNotification',
-              contact: data,
-              actionType: 'added',
-              addedBy: 'paste-tool@local',
-              timestamp: new Date().toISOString()
-            })
+      });
+    }
+
+    function openEditor(c){
+      editing=c;
+      document.getElementById('f_company').value=c.company||'';
+      document.getElementById('f_sector').value=c.sector||'';
+      document.getElementById('f_industry').value=c.industry||'';
+      document.getElementById('f_name').value=c.name||'';
+      document.getElementById('f_title').value=c.title||'';
+      document.getElementById('f_email').value=c.email||'';
+      document.getElementById('f_phone').value=c.phone||'';
+      document.getElementById('f_phone2').value=c.phone2||'';
+      document.getElementById('f_website').value=c.website||'';
+      document.getElementById('f_linkedin').value=c.linkedin||'';
+      document.getElementById('f_address').value=c.address||'';
+      document.getElementById('f_notes').value=c.notes||'';
+      document.getElementById('modal').style.display='flex';
+    }
+    function closeEditor(){ document.getElementById('modal').style.display='none'; editing=null; }
+
+    async function saveEditing(){
+      if(!editing){ closeEditor(); return; }
+      const payload={
+        company:document.getElementById('f_company').value.trim(),
+        sector:document.getElementById('f_sector').value,
+        industry:document.getElementById('f_industry').value,
+        name:document.getElementById('f_name').value.trim(),
+        title:document.getElementById('f_title').value.trim(),
+        email:document.getElementById('f_email').value.trim(),
+        phone:document.getElementById('f_phone').value.trim(),
+        phone2:document.getElementById('f_phone2').value.trim(),
+        website:document.getElementById('f_website').value.trim(),
+        linkedin:document.getElementById('f_linkedin').value.trim(),
+        address:document.getElementById('f_address').value.trim(),
+        notes:document.getElementById('f_notes').value.trim()
+      };
+      if(!payload.email && !payload.name){ showBanner('Provide at least an email or a name','warn'); return; }
+
+      const btn=document.getElementById('btnSave'); const prev=btn.textContent;
+      btn.textContent='Saving...'; btn.disabled=true;
+      try{
+        const res=await fetch(CONFIG.GOOGLE_APPS_SCRIPT_URL,{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({action:'saveContact',contact:payload,addedBy:'paste-web',timestamp:new Date().toISOString()})
+        });
+        const data=await res.json();
+        if(data.success){
+          showBanner(`Saved ${payload.name || payload.email} • Sheet updated and team notified`,'ok');
+          // Fire notification (no await)
+          fetch(CONFIG.GOOGLE_APPS_SCRIPT_URL,{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({action:'sendNotification',contact:payload,actionType:'added',addedBy:'paste-web',timestamp:new Date().toISOString()})
           }).catch(()=>{});
-        } else {
-          showMessage(result.error || 'Failed to save contact', 'error');
-          setBanner(result.error || 'Failed to save contact', 'error');
+          closeEditor();
+        }else{
+          showBanner(data.error||'Save failed','err');
         }
-        saveBtn.innerHTML = prev;
-        saveBtn.disabled = false;
-      } catch (err) {
-        console.error(err);
-        showMessage('Network or server error while saving', 'error');
-        setBanner('Network or server error while saving', 'error');
-        const saveBtn = document.getElementById('saveButton');
-        if (saveBtn) { saveBtn.innerHTML = '<span class="button-text">💾 SAVE CONTACT</span>'; saveBtn.disabled = false; }
+      }catch(e){
+        console.error(e);
+        showBanner('Network or server error','err');
+      }finally{
+        btn.textContent=prev; btn.disabled=false;
       }
     }
 
-    // Extract button handler
-    document.getElementById('extractButton').addEventListener('click', () => {
-      const raw = document.getElementById('manualSignatureInput').value.trim();
-      if (!raw) {
-        setBanner('Please paste a signature first.', 'warning');
-        return;
-      }
-      const sigs = extractSignaturesFromMessage(raw);
-      // If the whole content looks like a signature and split found nothing, fallback to raw
-      const candidates = sigs.length > 0 ? sigs : [raw];
-      const contacts = [];
-      const seen = new Set();
-      candidates.forEach(txt => {
-        const c = parseSignature(txt);
-        if ((c.email || c.name) && (!c.email || !seen.has((c.email||'').toLowerCase()))) {
-          if (c.email) seen.add(c.email.toLowerCase());
-          contacts.push(c);
+    // Wire UI
+    document.getElementById('btnExtract').addEventListener('click',()=>{
+      const raw=document.getElementById('sig').value.trim();
+      if(!raw){ showBanner('Please paste a signature first','warn'); return; }
+      const pieces=extractBlocks(raw);
+      const cands=pieces.length? pieces : [raw];
+      const out=[]; const seen=new Set();
+      cands.forEach(t=>{
+        const c=parseSignature(t);
+        const key=(c.email||'').toLowerCase();
+        if((c.email||c.name) && (!key || !seen.has(key))){
+          if(key) seen.add(key);
+          out.push(c);
         }
       });
-      currentContacts = contacts;
-      if (contacts.length === 0) {
-        setBanner('No contact details detected. Try selecting only the signature block.', 'warning');
-      } else {
-        setBanner(`Extracted ${contacts.length} contact${contacts.length>1?'s':''}.`, 'success');
-      }
-      renderContacts(contacts);
+      contacts=out;
+      renderContacts(out);
+      if(!out.length) showBanner('No contact details found. Try selecting only the signature portion.','warn');
+      else showBanner(`Extracted ${out.length} contact${out.length>1?'s':''}`,'ok');
     });
 
-    // Clear button
-    document.getElementById('clearButton').addEventListener('click', () => {
-      document.getElementById('manualSignatureInput').value = '';
-      currentContacts = [];
-      renderContacts([]);
-      setBanner('Cleared.', 'success');
+    document.getElementById('btnClear').addEventListener('click',()=>{
+      document.getElementById('sig').value='';
+      contacts=[]; renderContacts([]);
+      showBanner('Cleared','ok');
     });
 
-    // Keyboard shortcuts
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
-        const modal = document.getElementById('editModal');
-        if (modal.style.display === 'flex') closeEditModal();
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-        const modal = document.getElementById('editModal');
-        if (modal.style.display === 'flex') saveContact();
-      }
+    document.getElementById('btnCancel').addEventListener('click', closeEditor);
+    document.getElementById('btnSave').addEventListener('click', saveEditing);
+
+    document.addEventListener('keydown',(e)=>{
+      if(e.key==='Escape'){ if(document.getElementById('modal').style.display==='flex') closeEditor(); }
+      if((e.ctrlKey||e.metaKey) && e.key==='Enter'){ if(document.getElementById('modal').style.display==='flex') saveEditing(); }
     });
   </script>
 </body>
