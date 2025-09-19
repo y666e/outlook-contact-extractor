@@ -494,4 +494,312 @@ function createContactCard(contact, index) {
         ${contact.rawSignature ? `
             <div class="signature-preview">
                 <div class="preview-label">SIGNATURE PREVIEW</div>
-                <div class="preview-text">${cleanSignatureForDisplay(contact.rawSignature).substring(0, 120)}${contact.rawSignature.length >
+                <div class="preview-text">${cleanSignatureForDisplay(contact.rawSignature).substring(0, 120)}${contact.rawSignature.length > 120 ? '...' : ''}</div>
+            </div>
+        ` : ''}
+        
+        <button class="contact-action-button" onclick="showEditForm(${index})">
+            <span class="button-text">EDIT & SAVE</span>
+        </button>
+        
+        <div class="contact-separator"></div>
+    `;
+    
+    return card;
+}
+
+// Clean signature for display
+function cleanSignatureForDisplay(signature) {
+    if (!signature) return '';
+    return signature
+        .replace(/\[.*?image.*?\]/gi, '')
+        .replace(/\*+/g, '')
+        .replace(/\r?\n{2,}/g, '\n')
+        .replace(/\n/g, '<br>')
+        .trim();
+}
+
+// Show edit form modal
+function showEditForm(contactIndex) {
+    const contact = currentContacts[contactIndex];
+    if (!contact) return;
+    
+    currentEditingContact = contact;
+    
+    // Populate form fields
+    populateEditForm(contact);
+    
+    // Show modal
+    const modal = document.getElementById('editModal');
+    modal.style.display = 'flex';
+    modal.classList.add('fade-in');
+    
+    // Focus first input
+    setTimeout(() => {
+        const firstInput = modal.querySelector('input, select, textarea');
+        if (firstInput) firstInput.focus();
+    }, 300);
+}
+
+// Populate edit form with contact data
+function populateEditForm(contact) {
+    document.getElementById('company').value = contact.company || '';
+    document.getElementById('sector').value = contact.sector || '';
+    document.getElementById('industry').value = contact.industry || '';
+    document.getElementById('name').value = contact.name || '';
+    document.getElementById('title').value = contact.title || '';
+    document.getElementById('email').value = contact.email || '';
+    document.getElementById('phone').value = contact.phone || '';
+    document.getElementById('phone2').value = contact.phone2 || '';
+    document.getElementById('website').value = contact.website || '';
+    document.getElementById('linkedin').value = contact.linkedin || '';
+    document.getElementById('address').value = contact.address || '';
+    document.getElementById('notes').value = contact.notes || '';
+}
+
+// Close edit modal
+function closeEditModal() {
+    const modal = document.getElementById('editModal');
+    modal.style.display = 'none';
+    modal.classList.remove('fade-in');
+    currentEditingContact = null;
+}
+
+// Save contact
+function saveContact() {
+    try {
+        if (!currentEditingContact) {
+            showMessage('No contact selected for saving', 'error');
+            return;
+        }
+        
+        // Get form data
+        const formData = {
+            company: document.getElementById('company').value.trim(),
+            sector: document.getElementById('sector').value,
+            industry: document.getElementById('industry').value,
+            name: document.getElementById('name').value.trim(),
+            title: document.getElementById('title').value.trim(),
+            email: document.getElementById('email').value.trim(),
+            phone: document.getElementById('phone').value.trim(),
+            phone2: document.getElementById('phone2').value.trim(),
+            website: document.getElementById('website').value.trim(),
+            linkedin: document.getElementById('linkedin').value.trim(),
+            address: document.getElementById('address').value.trim(),
+            notes: document.getElementById('notes').value.trim()
+        };
+        
+        // Validate required fields
+        if (!formData.email && !formData.name) {
+            showMessage('Please provide at least an email or name', 'error');
+            return;
+        }
+        
+        // Show saving state
+        const saveButton = document.getElementById('saveButton');
+        const originalText = saveButton.innerHTML;
+        saveButton.innerHTML = '<span class="button-text">SAVING...</span>';
+        saveButton.disabled = true;
+        
+        // Save to Google Sheets via Google Apps Script
+        saveContactToSheet(formData)
+            .then(() => {
+                showMessage(`Contact ${formData.name || formData.email} saved successfully!`, 'success');
+                closeEditModal();
+                
+                // Send notification email
+                sendNotificationEmail(formData, 'added');
+                
+            })
+            .catch((error) => {
+                console.error('Save error:', error);
+                showMessage('Failed to save contact. Please try again.', 'error');
+            })
+            .finally(() => {
+                saveButton.innerHTML = originalText;
+                saveButton.disabled = false;
+            });
+        
+    } catch (error) {
+        console.error('Error saving contact:', error);
+        showMessage('Error saving contact', 'error');
+    }
+}
+
+// Save contact to Google Sheets
+function saveContactToSheet(contact) {
+    return new Promise((resolve, reject) => {
+        const data = {
+            action: 'saveContact',
+            contact: contact,
+            addedBy: Office.context.mailbox.userProfile.emailAddress,
+            timestamp: new Date().toISOString()
+        };
+        
+        fetch(CONFIG.GOOGLE_APPS_SCRIPT_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                resolve(result);
+            } else {
+                reject(new Error(result.error || 'Failed to save contact'));
+            }
+        })
+        .catch(error => {
+            console.error('Network error:', error);
+            reject(error);
+        });
+    });
+}
+
+// Send notification email
+function sendNotificationEmail(contact, action) {
+    const data = {
+        action: 'sendNotification',
+        contact: contact,
+        actionType: action,
+        addedBy: Office.context.mailbox.userProfile.emailAddress,
+        timestamp: new Date().toISOString()
+    };
+    
+    fetch(CONFIG.GOOGLE_APPS_SCRIPT_URL, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+    })
+    .catch(error => {
+        console.error('Failed to send notification:', error);
+    });
+}
+
+// Process manual signature input
+function processManualSignature() {
+    const input = document.getElementById('manualSignatureInput');
+    const sigText = input.value.trim();
+    
+    if (!sigText) {
+        showMessage('Please paste a signature before extracting', 'warning');
+        return;
+    }
+    
+    try {
+        // Show processing state
+        const button = document.getElementById('extractButton');
+        const originalText = button.innerHTML;
+        button.innerHTML = '<span class="button-text">PROCESSING...</span>';
+        button.disabled = true;
+        
+        // Parse the manual signature
+        const contact = parseSignature(sigText);
+        
+        if (!contact.email && !contact.name) {
+            showMessage('No contact information found in the signature', 'warning');
+        } else {
+            // Show edit form with the parsed contact
+            currentContacts = [contact];
+            currentEditingContact = contact;
+            populateEditForm(contact);
+            showEditForm(0);
+        }
+        
+        // Reset button
+        button.innerHTML = originalText;
+        button.disabled = false;
+        
+        // Clear input
+        input.value = '';
+        
+    } catch (error) {
+        console.error('Error processing manual signature:', error);
+        showMessage('Error processing signature', 'error');
+    }
+}
+
+// Refresh extraction
+function refreshExtraction() {
+    try {
+        showMessage('Refreshing contact extraction...', 'success');
+        
+        // Clear current data
+        currentContacts = [];
+        threadCache = {};
+        
+        // Reload email content
+        loadCurrentEmail();
+        
+    } catch (error) {
+        console.error('Error refreshing:', error);
+        showMessage('Error refreshing extraction', 'error');
+    }
+}
+
+// Handle keyboard shortcuts
+function handleKeyboardShortcuts(event) {
+    // ESC to close modal
+    if (event.key === 'Escape') {
+        const modal = document.getElementById('editModal');
+        if (modal.style.display === 'flex') {
+            closeEditModal();
+        }
+    }
+    
+    // Ctrl/Cmd + Enter to save when modal is open
+    if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+        const modal = document.getElementById('editModal');
+        if (modal.style.display === 'flex') {
+            saveContact();
+        }
+    }
+    
+    // Ctrl/Cmd + R to refresh
+    if ((event.ctrlKey || event.metaKey) && event.key === 'r') {
+        event.preventDefault();
+        refreshExtraction();
+    }
+}
+
+// Show message to user
+function showMessage(message, type = 'success') {
+    const container = document.getElementById('messageContainer');
+    const content = document.getElementById('messageContent');
+    
+    // Clear existing classes
+    content.className = 'message-content';
+    
+    // Add type-specific class
+    content.classList.add(`message-${type}`);
+    content.textContent = message;
+    
+    // Show message
+    container.style.display = 'block';
+    container.classList.add('fade-in');
+    
+    // Auto-hide after duration
+    setTimeout(() => {
+        container.style.display = 'none';
+        container.classList.remove('fade-in');
+    }, CONFIG.MESSAGE_DISPLAY_DURATION);
+}
+
+// Error handler for unhandled promises
+window.addEventListener('unhandledrejection', (event) => {
+    console.error('Unhandled promise rejection:', event.reason);
+    showMessage('An unexpected error occurred', 'error');
+});
+
+// Global error handler
+window.onerror = (message, source, lineno, colno, error) => {
+    console.error('Global error:', message, 'at', source, lineno, colno, error);
+    showMessage('An error occurred in the application', 'error');
+    return true;
+};
+
+console.log('Contact Extractor Pro - Outlook Add-in Loaded');
